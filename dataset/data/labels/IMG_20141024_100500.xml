@@ -1,0 +1,26 @@
+<annotation>
+	<folder>Edata</folder>
+	<filename>IMG_20141024_100500.jpg</filename>
+	<path>/home/wk/wk_ws/myTest/Edata/IMG_20141024_100500.jpg</path>
+	<source>
+		<database>Unknown</database>
+	</source>
+	<size>
+		<width>2448</width>
+		<height>3264</height>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>meter</name>
+		<pose>Unspecified</pose>
+		<truncated>1</truncated>
+		<difficult>0</difficult>
+		<bndbox>
+			<xmin>1</xmin>
+			<ymin>1</ymin>
+			<xmax>2448</xmax>
+			<ymax>2957</ymax>
+		</bndbox>
+	</object>
+</annotation>
