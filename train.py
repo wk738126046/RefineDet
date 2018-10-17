@@ -153,14 +153,14 @@ def mytrain(net,num_classes,train_data,valid_data,ctx,start_epoch, end_epoch, \
             arm_cls_loss=arm_cls_loss,cls_loss=cls_loss,box_loss=box_loss,trainer=None):
     if trainer is None:
         # trainer = gluon.Trainer(net.collect_params(), 'sgd', {'learning_rate': 0.01,'momentum':0.9, 'wd':50.0})
-        # trainer = gluon.Trainer(net.collect_params(), 'adam', {'learning_rate': 0.003,'clip_gradient':2.0})
-        trainer = gluon.Trainer(net.collect_params(), 'adam', {'learning_rate': 0.003})
+        trainer = gluon.Trainer(net.collect_params(), 'adam', {'learning_rate': 0.003,'clip_gradient':2.0})
+        # trainer = gluon.Trainer(net.collect_params(), 'adam', {'learning_rate': 0.003})
     box_metric = metric.MAE()
 
     ## add visible
     # collect parameter names for logging the gradients of parameters in each epoch
     params = net.collect_params()
-    param_names = params.keys()
+    # param_names = params.keys()
     # define a summary writer that logs data and flushes to the file every 5 seconds
     sw = SummaryWriter(logdir='./logs', flush_secs=5)
     global_step  = 0
@@ -258,8 +258,6 @@ def mytrain(net,num_classes,train_data,valid_data,ctx,start_epoch, end_epoch, \
 
             sw.add_scalar(tag='loss', value=loss.mean().asscalar(), global_step=global_step)
             global_step += 1
-            if i == 0:
-                sw.add_image('minist_first_minibatch', data.reshape((data.shape[0], 3, 512, 512)), e)# show image
             # loss.backward(retain_graph=False)
             autograd.backward(loss)
             # print(net.collect_params().get('conv4_3_weight').data())
@@ -287,7 +285,7 @@ def mytrain(net,num_classes,train_data,valid_data,ctx,start_epoch, end_epoch, \
             else:
                 outs = nd.concat(outs, out, dim=0)
                 labels = nd.concat(labels, label, dim=0)
-            box_metric.update([odm_loc_target], [odm_loc_preds * odm_loc_target_mask]) ## label ??
+            box_metric.update([odm_loc_target], [odm_loc_preds * odm_loc_target_mask]) 
         print('-------{} epoch end ------'.format(e))
         train_AP = evaluate_MAP(outs, labels)
         valid_AP, val_box_metric = evaluate_acc(net,valid_data, ctx)
@@ -298,11 +296,13 @@ def mytrain(net,num_classes,train_data,valid_data,ctx,start_epoch, end_epoch, \
         print('arm loss: ',arm_loss)
         if e == 0:
             sw.add_graph(net)
-        grads = [i.grad() for i in net.collect_params().values()]
-        assert len(grads) == len(param_names)
+        # grads = [i.grad() for i in net.collect_params().values()]
+        grads_4_3 = net.collect_params().get('vgg0_conv9_weight').grad()
+        sw.add_histogram(tag ='vgg0_conv9_weight',values=grads_4_3,global_step=e, bins=1000 )
+        # assert len(grads) == len(param_names)
         # logging the gradients of parameters for checking convergence
-        for i, name in enumerate(param_names):
-            sw.add_histogram(tag=name, values=grads[i], global_step=e, bins=1000)
+        # for i, name in enumerate(param_names):
+        #     sw.add_histogram(tag=name, values=grads[i], global_step=e, bins=1000)
 
 
         # net.export('./Model/RefineDet_MeterDetect') # net
@@ -313,7 +313,6 @@ def mytrain(net,num_classes,train_data,valid_data,ctx,start_epoch, end_epoch, \
             print("valid mae: %.4f AP: %.4f" % (val_box_metric.get()[1], valid_AP))
         sw.add_scalar(tag='train_AP',value=train_AP,global_step=e)
         sw.add_scalar(tag='valid_AP',value=valid_AP,global_step=e)
-    
     sw.close()
     if True:
         info["loss"] = np.array(info["loss"])
