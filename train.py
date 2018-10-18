@@ -16,12 +16,13 @@ from mxnet.ndarray.contrib import MultiBoxPrior,MultiBoxTarget,MultiBoxDetection
 from model import sizes,ratios,normalizations,RefineDet
 
 
-data_shape = (3,512,512)
+data_shape = (3,320,320)
+# data_shape = (3,512,512)
 std = np.array([51.58252012, 50.01343078, 57.31053303])
 rgb_mean = np.array([114.06836982, 130.57876876, 143.64666367])
 ctx = mx.gpu(0)
 resize = data_shape[1:]
-rec_prefix = './dataset/data/rec/img_'+str(resize[0])+'_'+str(resize[1])
+rec_prefix = './dataset/data_320/rec/img_'+str(resize[0])+'_'+str(resize[1])
 # num_class = 1
 '''
 loss define
@@ -94,12 +95,14 @@ def evaluate_acc(net,data_iter,ctx):
         odm_cls_target = []
         label_bs = nd.split(data=label,axis=0,num_outputs=label.shape[0])
         odm_cls_preds_bs = nd.split(data=odm_cls_preds,axis=0,num_outputs=label.shape[0])
-        for i in range(label.shape[0]):
-            odm_tmp = MultiBoxTarget(odm_anchor_boxes_bs[i].expand_dims(axis=0),label_bs[i].expand_dims(axis=0),\
-                                            odm_cls_preds_bs[i].expand_dims(axis=0),overlap_threshold=.5,negative_mining_ratio=3,negative_mining_thresh=.5)
-            # 多个batch
-            # odm_tmp = MultiBoxTarget(odm_anchor_boxes_bs[i],label_bs[i],\
-            #                         odm_cls_preds_bs[i],overlap_threshold=.5,negative_mining_ratio=3,negative_mining_thresh=.5)
+        for j in range(label.shape[0]):
+            if label.shape[0] == 1:
+                odm_tmp = MultiBoxTarget(odm_anchor_boxes_bs[j].expand_dims(axis=0),label_bs[j].expand_dims(axis=0),\
+                                    odm_cls_preds_bs[j].expand_dims(axis=0),overlap_threshold=.5,negative_mining_ratio=2,negative_mining_thresh=.5)
+                    ## 多个batch
+            else:
+                odm_tmp = MultiBoxTarget(odm_anchor_boxes_bs[j],label_bs[j],\
+                                    odm_cls_preds_bs[j],overlap_threshold=.5,negative_mining_ratio=3,negative_mining_thresh=.5)
             odm_loc_target.append(odm_tmp[0])
             odm_loc_target_mask.append(odm_tmp[1])
             odm_cls_target.append(odm_tmp[2])
@@ -140,11 +143,13 @@ from modify_label import modify_label
 from commom import multibox_layer
 from mxboard import SummaryWriter
 
-sizes = [[.07, .1025], [.15,.2121], [.3, .3674], [.45, .5196], [.6, .6708], \
-        [.75, .8216], [.9, .9721]]
+# sizes = [[.07, .1025], [.15,.2121], [.3, .3674], [.45, .5196], [.6, .6708], \
+#         [.75, .8216], [.9, .9721]]
+sizes = [[0.2, 0.272], [0.37, 0.447], [0.54, 0.619], [0.71, 0.79],[0.88, 0.961]] # vgg11 + 3 ssd layer
 ratios = [[1,2,.5], [1,2,.5,3,1./3], [1,2,.5,3,1./3], [1,2,.5,3,1./3], \
-        [1,2,.5,3,1./3], [1,2,.5], [1,2,.5]]
-normalizations = [10, -1, -1, -1, -1, -1, -1]
+        [1,2,.5,3,1./3]]
+# normalizations = [10, -1, -1, -1, -1, -1, -1]
+normalizations = [10, -1, -1, -1, -1]
 
 arm_cls_loss = gluon.loss.SoftmaxCrossEntropyLoss()
 cls_loss = FocalLoss()
@@ -153,7 +158,7 @@ def mytrain(net,num_classes,train_data,valid_data,ctx,start_epoch, end_epoch, \
             arm_cls_loss=arm_cls_loss,cls_loss=cls_loss,box_loss=box_loss,trainer=None):
     if trainer is None:
         # trainer = gluon.Trainer(net.collect_params(), 'sgd', {'learning_rate': 0.01,'momentum':0.9, 'wd':50.0})
-        trainer = gluon.Trainer(net.collect_params(), 'adam', {'learning_rate': 0.003,'clip_gradient':2.0})
+        trainer = gluon.Trainer(net.collect_params(), 'adam', {'learning_rate': 0.001,'clip_gradient':2.0})
         # trainer = gluon.Trainer(net.collect_params(), 'adam', {'learning_rate': 0.003})
     box_metric = metric.MAE()
 
@@ -173,8 +178,8 @@ def mytrain(net,num_classes,train_data,valid_data,ctx,start_epoch, end_epoch, \
         tic = time.time()
         _loss = [0, 0]
         arm_loss = [0,0]
-        if e == 150 or e == 180:
-            trainer.set_learning_rate(trainer.learning_rate * 0.2)
+        # if e == 6 or e == 100:
+        #     trainer.set_learning_rate(trainer.learning_rate * 0.2)
 
         outs, labels = None, None
         for i, batch in enumerate(train_data):
@@ -218,12 +223,14 @@ def mytrain(net,num_classes,train_data,valid_data,ctx,start_epoch, end_epoch, \
                 # print('---4 : odm_cls_preds_bs shape: {}'.format(odm_cls_preds_bs[0].shape))
                 # print('---4 : label_bs shape: {}'.format(label_bs[0].shape))
                 
-                for i in range(label.shape[0]):
-                    odm_tmp = MultiBoxTarget(odm_anchor_boxes_bs[i].expand_dims(axis=0),label_bs[i].expand_dims(axis=0),\
-                                            odm_cls_preds_bs[i].expand_dims(axis=0),overlap_threshold=.5,negative_mining_ratio=2,negative_mining_thresh=.5)
+                for j in range(label.shape[0]):
+                    if label.shape[0] == 1:
+                        odm_tmp = MultiBoxTarget(odm_anchor_boxes_bs[j].expand_dims(axis=0),label_bs[j].expand_dims(axis=0),\
+                                            odm_cls_preds_bs[j].expand_dims(axis=0),overlap_threshold=.5,negative_mining_ratio=2,negative_mining_thresh=.5)
                     ## 多个batch
-                    # odm_tmp = MultiBoxTarget(odm_anchor_boxes_bs[i],label_bs[i],\
-                    #                         odm_cls_preds_bs[i],overlap_threshold=.5,negative_mining_ratio=3,negative_mining_thresh=.5)
+                    else:
+                        odm_tmp = MultiBoxTarget(odm_anchor_boxes_bs[j],label_bs[j],\
+                                            odm_cls_preds_bs[j],overlap_threshold=.5,negative_mining_ratio=3,negative_mining_thresh=.5)
                     odm_loc_target.append(odm_tmp[0])
                     odm_loc_target_mask.append(odm_tmp[1])
                     odm_cls_target.append(odm_tmp[2])
@@ -258,8 +265,8 @@ def mytrain(net,num_classes,train_data,valid_data,ctx,start_epoch, end_epoch, \
 
             sw.add_scalar(tag='loss', value=loss.mean().asscalar(), global_step=global_step)
             global_step += 1
-            # loss.backward(retain_graph=False)
-            autograd.backward(loss)
+            loss.backward(retain_graph=False)
+            # autograd.backward(loss)
             # print(net.collect_params().get('conv4_3_weight').data())
             # print(net.collect_params().get('vgg0_conv9_weight').grad())
             ### 单独测试梯度
@@ -269,9 +276,9 @@ def mytrain(net,num_classes,train_data,valid_data,ctx,start_epoch, end_epoch, \
             # odm_loss_loc.backward(retain_graph=False)
             
             trainer.step(data.shape[0])
-            _loss[0] += nd.mean(odm_loss_cls).asscalar()
+            _loss[0] += nd.mean(odm_loss_cls).asscalar()        
             _loss[1] += nd.mean(odm_loss_loc).asscalar()
-            arm_loss[0] += nd.mean(arm_loss_cls).asscalar()
+            arm_loss[0] += nd.mean(arm_loss_cls).asscalar()            
             arm_loss[1] += nd.mean(arm_loss_loc).asscalar()
             # print(arm_loss)
             arm_cls_prob = nd.SoftmaxActivation(arm_cls_preds, mode='channel')
@@ -291,14 +298,16 @@ def mytrain(net,num_classes,train_data,valid_data,ctx,start_epoch, end_epoch, \
         valid_AP, val_box_metric = evaluate_acc(net,valid_data, ctx)
         info["train_ap"].append(train_AP)
         info["valid_ap"].append(valid_AP)
-        info["loss"].append(_loss)
+        info["loss"].append( _loss )
         print('odm loss: ',_loss)
         print('arm loss: ',arm_loss)
         if e == 0:
             sw.add_graph(net)
         # grads = [i.grad() for i in net.collect_params().values()]
-        grads_4_3 = net.collect_params().get('vgg0_conv9_weight').grad()
-        sw.add_histogram(tag ='vgg0_conv9_weight',values=grads_4_3,global_step=e, bins=1000 )
+        # grads_4_3 = net.collect_params().get('vgg0_conv9_weight').grad()
+        # sw.add_histogram(tag ='vgg0_conv9_weight',values=grads_4_3,global_step=e, bins=1000 )
+        grads_4_2 = net.collect_params().get('vgg0_conv5_weight').grad()
+        sw.add_histogram(tag ='vgg0_conv5_weight',values=grads_4_2,global_step=e, bins=1000 )
         # assert len(grads) == len(param_names)
         # logging the gradients of parameters for checking convergence
         # for i, name in enumerate(param_names):
@@ -354,7 +363,7 @@ if __name__ == '__main__':
     net.hybridize() # MultiBoxPrior cannot support symbol
     
     #3. train
-    mytrain(net,1,train_data,valid_data,ctx, 0, 220)
+    mytrain(net,1,train_data,valid_data,ctx, 0, 120)
     mkdir_if_not_exist("./Model")
     net.save_parameters("./Model/RefineDet_MeterDetect.param") # weight
     net.export('./Model/RefineDet_MeterDetect.json') # net

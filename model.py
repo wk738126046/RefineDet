@@ -133,35 +133,36 @@ def vgg11_backbone(prefix='my_net_'):
     net1,net2 = get_vgg11bn_conv(prefix)
     net2.add(nn.MaxPool2D(pool_size=3,strides=1,padding=1,prefix='pool5_'))     
     #group6  
-    net2.add(nn.Conv2D(channels=1024,kernel_size=3,padding=6,dilation=6,prefix='conv6_1_'),
+    net2.add(nn.Conv2D(channels=256,kernel_size=3,padding=6,dilation=6,prefix='conv6_1_'),
            nn.BatchNorm(prefix='conv6_1_'),
            nn.Activation('relu',prefix='conv6_1_relu_'))
     #group7
-    net2.add(nn.Conv2D(channels=1024,kernel_size=1,prefix='conv7_1_'),
+    net2.add(nn.Conv2D(channels=256,kernel_size=1,prefix='conv7_1_'),
            nn.BatchNorm(prefix='conv7_1_'),
            nn.Activation('relu',prefix='conv7_1_relu_')) 
     # ssd extra layers
     ### layer 3
     net3 = nn.HybridSequential(prefix=prefix)
-    net3.add(conv_act_layer(in_channels=256,prefix='conv8_',num=1,kernel_size=1,padding=0),
-            conv_act_layer(in_channels=512,prefix='conv8_',num=2,kernel_size=3,padding=1,stride=2))
+    net3.add(conv_act_layer(in_channels=128,prefix='conv8_',num=1,kernel_size=1,padding=0),
+            conv_act_layer(in_channels=128,prefix='conv8_',num=2,kernel_size=3,padding=1,stride=2))
     ### layer 4
     net4 = nn.HybridSequential(prefix=prefix)
     net4.add(conv_act_layer(in_channels=128,prefix='conv9_',num=1,kernel_size=1,padding=0),
-            conv_act_layer(in_channels=256,prefix='conv9_',num=2,kernel_size=3,padding=1,stride=2))
+            conv_act_layer(in_channels=128,prefix='conv9_',num=2,kernel_size=3,padding=1,stride=2))
     ### layer 5
     net5 = nn.HybridSequential(prefix=prefix)
     net5.add(conv_act_layer(in_channels=128,prefix='conv10_',num=1,kernel_size=1,padding=0),
-            conv_act_layer(in_channels=256,prefix='conv10_',num=2,kernel_size=3,padding=1,stride=2))
-    ### layer 6
-    net6 = nn.HybridSequential(prefix=prefix)
-    net6.add(conv_act_layer(in_channels=128,prefix='conv11_',num=1,kernel_size=1,padding=0),
-            conv_act_layer(in_channels=256,prefix='conv11_',num=2,kernel_size=3,padding=1,stride=2))
-    ### layer 7
-    net7 = nn.HybridSequential(prefix=prefix)
-    net7.add(conv_act_layer(in_channels=128,prefix='conv12_',num=1,kernel_size=1,padding=0),
-            conv_act_layer(in_channels=256,prefix='conv12_',num=2,kernel_size=4,padding=1,stride=1))
-    return [net1,net2,net3,net4,net5,net6,net7]
+            conv_act_layer(in_channels=128,prefix='conv10_',num=2,kernel_size=3,padding=1,stride=2))
+    # ### layer 6
+    # net6 = nn.HybridSequential(prefix=prefix)
+    # net6.add(conv_act_layer(in_channels=128,prefix='conv11_',num=1,kernel_size=1,padding=0),
+    #         conv_act_layer(in_channels=256,prefix='conv11_',num=2,kernel_size=3,padding=1,stride=2))
+    # ### layer 7
+    # net7 = nn.HybridSequential(prefix=prefix)
+    # net7.add(conv_act_layer(in_channels=128,prefix='conv12_',num=1,kernel_size=1,padding=0),
+    #         conv_act_layer(in_channels=256,prefix='conv12_',num=2,kernel_size=4,padding=1,stride=1))
+    # return [net1,net2,net3,net4,net5,net6,net7]
+    return [net1,net2,net3,net4,net5]
 
 def get_vgg16bn_conv(prefix,ctx=mx.gpu(0)):
     vgg16net = model_zoo.vision.vgg16_bn(pretrained=True,ctx=ctx)
@@ -227,8 +228,8 @@ class RefineDet(nn.HybridBlock):
         self.ctx = ctx
         self.normalizations = normalizations
         with self.name_scope():
-            net_layers = vgg16_backbone(prefix)
-            # net_layers = vgg11_backbone(prefix)
+            # net_layers = vgg16_backbone(prefix)
+            net_layers = vgg11_backbone(prefix)
             self.net = nn.HybridSequential(prefix=prefix)
             self.net.add(*net_layers)
             self.net.initialize(ctx=ctx,init=mx.init.Xavier(),force_reinit=False)
@@ -251,7 +252,7 @@ class RefineDet(nn.HybridBlock):
 
 if __name__ == "__main__":
     net = RefineDet(num_classes=1,sizes=sizes,ratios=ratios,normalizations=normalizations,verbose=True,prefix='refineDet_')
-    # print(net.collect_params())
+    print(net.collect_params())
     print(net)
     # net.hybridize()
     # x = nd.random_normal(shape=(1,3,512,512),ctx=mx.gpu(0))

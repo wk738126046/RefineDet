@@ -44,6 +44,19 @@ def tcb_module_last(ssd_layer, out_channels = 256, level = 1):
     # tcb_last.hybridize() # symbol compile
     out = tcb_last(ssd_layer)
     return out
+# init deconv
+def bilinear_kernel(in_channels, out_channels, kernel_size):
+    factor = (kernel_size + 1) // 2
+    if kernel_size % 2 == 1:
+        center = factor - 1
+    else:
+        center = factor - 0.5
+    og = np.ogrid[:kernel_size, :kernel_size]
+    filt = (1 - abs(og[0] - center) / factor) * \
+        (1 - abs(og[1] - center) / factor)
+    weight = np.zeros((in_channels, out_channels, kernel_size, kernel_size),dtype='float32')
+    weight[range(in_channels), range(out_channels), :, :] = filt
+    return nd.array(weight)
 
 ## TCB contain deconv
 def deconv_tcb_layer(out_channels,level,kernel_size=2,padding=0,stride=2,use_bn=False):
@@ -75,8 +88,14 @@ def tcb_module(ssd_layer, deconv_layer,out_channels = 256, level = 1):
 #     tcb2 = nn.HybridSequential('tcb_module_deconv_')
 #     tcb2.add(deconv_tcb_layer(out_channels=256,level=level))
     # print('----tcb module  11111 ---')
-    tcb2 = deconv_tcb_layer(out_channels=256,level=level)
-    tcb2.initialize(init=mx.init.Xavier(),ctx=mx.gpu(0))
+    if level == 3 and ssd_layer.shape[2] == 5: ## input 320 and deconv 3*3 to 5*5
+        tcb2 = deconv_tcb_layer(out_channels=256,level=level,kernel_size=3,padding=1)
+        tcb2.initialize(init=mx.init.Constant(bilinear_kernel(ssd_layer.shape[1],256,3)),ctx=mx.gpu(0))    
+    else:
+        tcb2 = deconv_tcb_layer(out_channels=256,level=level)
+        tcb2.initialize(init=mx.init.Constant(bilinear_kernel(ssd_layer.shape[1],256,2)),ctx=mx.gpu(0))    
+    ## TODO: init use bilinear_kernel
+    # tcb2.initialize(init=mx.init.Xavier(),ctx=mx.gpu(0))
     out2 = tcb2(deconv_layer)
     # print('----tcb module  22222 ---')
     out3 = nd.ElementWiseSum(*[out1,out2])
@@ -100,7 +119,8 @@ def construct_refineDet(ssd_layers):
         return : all outputs of odm layers  
     '''
     out_layers = []
-    layers = ssd_layers[::-1] # layers reverse
+    layers = ssd_layers[::-1] # layers reverse TODO: use ndarry function
+    # layers = nd.reverse(data=ssd_layers,axis=0)
     for k, ssd_layer in enumerate(layers):
         if k == 0:
             out_layer = tcb_module_last(layers[k],256,level=4-k)
@@ -110,6 +130,7 @@ def construct_refineDet(ssd_layers):
             # print("odm_layer_{} : {}".format(6-k,out_layer.shape))
         out_layers.append(out_layer)
     return out_layers[::-1]
+    # return nd.reverse(data=out_layers,axis=0)
 
 # ssd_layers = [relu4_3, relu7, relu8_2, relu9_2, relu10_2, relu11_2, relu12_2]
 # sizes = [[.07, .1025], [.15,.2121], [.3, .3674], [.45, .5196], [.6, .6708], \
