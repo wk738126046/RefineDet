@@ -45,6 +45,7 @@ def tcb_module_last(ssd_layer, out_channels = 256, level = 1):
     out = tcb_last(ssd_layer)
     return out
 # init deconv
+import numpy as np
 def bilinear_kernel(in_channels, out_channels, kernel_size):
     factor = (kernel_size + 1) // 2
     if kernel_size % 2 == 1:
@@ -90,10 +91,10 @@ def tcb_module(ssd_layer, deconv_layer,out_channels = 256, level = 1):
     # print('----tcb module  11111 ---')
     if level == 3 and ssd_layer.shape[2] == 5: ## input 320 and deconv 3*3 to 5*5
         tcb2 = deconv_tcb_layer(out_channels=256,level=level,kernel_size=3,padding=1)
-        tcb2.initialize(init=mx.init.Constant(bilinear_kernel(ssd_layer.shape[1],256,3)),ctx=mx.gpu(0))    
+        tcb2.initialize(init=mx.init.Constant(bilinear_kernel(256,256,3)),ctx=mx.gpu(0))    
     else:
         tcb2 = deconv_tcb_layer(out_channels=256,level=level)
-        tcb2.initialize(init=mx.init.Constant(bilinear_kernel(ssd_layer.shape[1],256,2)),ctx=mx.gpu(0))    
+        tcb2.initialize(init=mx.init.Constant(bilinear_kernel(256,256,2)),ctx=mx.gpu(0))    
     ## TODO: init use bilinear_kernel
     # tcb2.initialize(init=mx.init.Xavier(),ctx=mx.gpu(0))
     out2 = tcb2(deconv_layer)
